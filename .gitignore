@@ -1,0 +1,11 @@
+.DS_Store
+.idea/
+.pytest_cache/
+.venv/
+__pycache__/
+*.py[cod]
+*.sqlite3
+*.db
+celerybeat-schedule
+.env
+.env.*

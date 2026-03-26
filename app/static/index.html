@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DataCollector — Панель управления</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0f1117;
+      --surface:   #1a1d27;
+      --border:    #2a2d3a;
+      --accent:    #4f8ef7;
+      --green:     #3ecf8e;
+      --red:       #f75555;
+      --yellow:    #f7c355;
+      --text:      #e2e8f0;
+      --muted:     #8892a4;
+      --radius:    12px;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 32px;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .logo { font-size: 18px; font-weight: 700; color: var(--accent); letter-spacing: -0.3px; }
+    .logo span { color: var(--muted); font-weight: 400; font-size: 13px; margin-left: 10px; }
+
+    .health-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .health-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: var(--muted);
+      transition: background 0.3s;
+    }
+    .health-dot.ok  { background: var(--green); box-shadow: 0 0 8px var(--green); }
+    .health-dot.err { background: var(--red);   box-shadow: 0 0 8px var(--red); }
+
+    main {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 32px 24px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    @media (max-width: 800px) { main { grid-template-columns: 1fr; } }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+    }
+    .card.wide { grid-column: 1 / -1; }
+
+    .card-title {
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--muted);
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .refresh-hint { font-size: 11px; color: var(--border); font-weight: 400; text-transform: none; letter-spacing: 0; }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+
+    .stat {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+    }
+    .stat-label { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+    .stat-value { font-size: 28px; font-weight: 700; color: var(--text); }
+    .stat-unit  { font-size: 13px; color: var(--muted); margin-left: 4px; }
+
+    .period-badge {
+      display: inline-block;
+      background: rgba(79,142,247,.15);
+      color: var(--accent);
+      border-radius: 20px;
+      padding: 2px 10px;
+      font-size: 11px;
+      font-weight: 600;
+      margin-bottom: 16px;
+    }
+
+    .load-row {
+      display: flex;
+      gap: 16px;
+      margin-top: 16px;
+    }
+    .load-item {
+      flex: 1;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 16px;
+    }
+    .load-item-label { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+    .load-item-value { font-size: 20px; font-weight: 700; }
+
+    .bar-wrap { height: 6px; background: var(--border); border-radius: 3px; margin-top: 8px; overflow: hidden; }
+    .bar      { height: 100%; border-radius: 3px; background: var(--accent); transition: width 0.6s ease; }
+    .bar.mem  { background: var(--green); }
+
+    button {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 20px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s;
+    }
+    button:hover   { opacity: 0.85; }
+    button:active  { transform: scale(0.97); }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    .btn-secondary {
+      background: var(--border);
+      color: var(--text);
+    }
+
+    .ingest-status {
+      margin-top: 16px;
+      padding: 12px 16px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 13px;
+      color: var(--muted);
+      min-height: 44px;
+    }
+
+    .form-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; margin-top: 16px; }
+    .form-group { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 160px; }
+    .form-group label { font-size: 12px; color: var(--muted); }
+    .form-group input {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      padding: 9px 12px;
+      font-size: 13px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .form-group input:focus { border-color: var(--accent); }
+
+    .report-status-box {
+      margin-top: 16px;
+      padding: 16px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      display: none;
+    }
+    .report-status-box.visible { display: block; }
+
+    .status-pill {
+      display: inline-block;
+      border-radius: 20px;
+      padding: 3px 12px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .pill-pending    { background: rgba(247,195,85,.15);  color: var(--yellow); }
+    .pill-processing { background: rgba(79,142,247,.15);  color: var(--accent); }
+    .pill-done       { background: rgba(62,207,142,.15);  color: var(--green);  }
+    .pill-failed     { background: rgba(247,85,85,.15);   color: var(--red);    }
+    .pill-в.очереди  { background: rgba(79,142,247,.15);  color: var(--accent); }
+
+    .s3-link {
+      display: block;
+      margin-top: 10px;
+      font-size: 12px;
+      color: var(--accent);
+      word-break: break-all;
+    }
+
+    .log-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 260px;
+      overflow-y: auto;
+    }
+    .log-list::-webkit-scrollbar { width: 4px; }
+    .log-list::-webkit-scrollbar-track { background: transparent; }
+    .log-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    .log-item {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      padding: 10px 14px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 12px;
+    }
+    .log-time  { color: var(--muted); white-space: nowrap; flex-shrink: 0; }
+    .log-msg   { color: var(--text); }
+    .log-ok    { border-left: 3px solid var(--green); }
+    .log-err   { border-left: 3px solid var(--red); }
+    .log-info  { border-left: 3px solid var(--accent); }
+
+    .skeleton {
+      background: linear-gradient(90deg, var(--border) 25%, var(--surface) 50%, var(--border) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
+      border-radius: 6px;
+      height: 28px;
+    }
+    @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+    .updated-at { font-size: 11px; color: var(--muted); margin-top: 4px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">DataCollector <span>Панель управления</span></div>
+  <div class="health-badge">
+    <div class="health-dot" id="healthDot"></div>
+    <span id="healthText">Проверка...</span>
+  </div>
+</header>
+
+<main>
+
+  <div class="card wide">
+    <div class="card-title">
+      Аналитика
+      <span class="refresh-hint" id="analyticsUpdated"></span>
+    </div>
+    <div class="period-badge">Последние 24 часа</div>
+    <div class="stats-grid" id="statsGrid">
+      <div class="stat"><div class="stat-label">Задач выполнено</div><div class="skeleton"></div></div>
+      <div class="stat"><div class="stat-label">Среднее время</div><div class="skeleton"></div></div>
+      <div class="stat"><div class="stat-label">Период</div><div class="skeleton"></div></div>
+    </div>
+    <div class="load-row" id="loadRow">
+      <div class="load-item">
+        <div class="load-item-label">Средняя нагрузка CPU</div>
+        <div class="skeleton" style="height:20px; margin-top:4px;"></div>
+        <div class="bar-wrap"><div class="bar" id="cpuBar" style="width:0%"></div></div>
+      </div>
+      <div class="load-item">
+        <div class="load-item-label">Максимальное использование памяти</div>
+        <div class="skeleton" style="height:20px; margin-top:4px;"></div>
+        <div class="bar-wrap"><div class="bar mem" id="memBar" style="width:0%"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Загрузка данных</div>
+    <p style="color:var(--muted); font-size:13px; margin-bottom:16px;">
+      Автоматически каждые 10 минут. Можно запустить вручную.
+    </p>
+    <button id="ingestBtn" onclick="triggerIngestion()">Запустить загрузку</button>
+    <div class="ingest-status" id="ingestStatus">Ожидание запуска...</div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Генерация отчёта</div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Начало периода</label>
+        <input type="datetime-local" id="periodFrom">
+      </div>
+      <div class="form-group">
+        <label>Конец периода</label>
+        <input type="datetime-local" id="periodTo">
+      </div>
+      <button onclick="generateReport()" id="reportBtn">Сформировать</button>
+    </div>
+    <div class="report-status-box" id="reportBox">
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
+        <span style="font-size:12px; color:var(--muted);">Статус:</span>
+        <span class="status-pill" id="reportStatusPill"></span>
+      </div>
+      <div style="font-size:12px; color:var(--muted);">ID задачи: <code id="reportTaskId" style="color:var(--text);"></code></div>
+      <a class="s3-link" id="reportS3Link" style="display:none;"></a>
+    </div>
+  </div>
+
+  <div class="card wide">
+    <div class="card-title">Журнал событий</div>
+    <ul class="log-list" id="logList">
+      <li class="log-item log-info">
+        <span class="log-time">—</span>
+        <span class="log-msg">Панель управления загружена</span>
+      </li>
+    </ul>
+  </div>
+
+</main>
+
+<script>
+  const API = '';
+
+  function now() {
+    return new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  }
+
+  function addLog(msg, type = 'info') {
+    const list = document.getElementById('logList');
+    const item = document.createElement('li');
+    item.className = `log-item log-${type}`;
+    item.innerHTML = `<span class="log-time">${now()}</span><span class="log-msg">${msg}</span>`;
+    list.prepend(item);
+    if (list.children.length > 50) list.lastElementChild.remove();
+  }
+
+  async function checkHealth() {
+    const dot  = document.getElementById('healthDot');
+    const text = document.getElementById('healthText');
+    try {
+      const res = await fetch(`${API}/health`);
+      const data = await res.json();
+      if (data.status === 'ok') {
+        dot.className = 'health-dot ok';
+        text.textContent = 'Сервис работает';
+      } else {
+        dot.className = 'health-dot err';
+        text.textContent = 'Сервис недоступен';
+      }
+    } catch {
+      dot.className = 'health-dot err';
+      text.textContent = 'Нет соединения';
+    }
+  }
+
+  function pillClass(status) {
+    const map = { pending: 'pill-pending', processing: 'pill-processing', done: 'pill-done', failed: 'pill-failed' };
+    return map[status] || 'pill-pending';
+  }
+
+  function statusLabel(status) {
+    const map = { pending: 'Ожидает', processing: 'Обрабатывается', done: 'Готово', failed: 'Ошибка', 'в очереди': 'В очереди' };
+    return map[status] || status;
+  }
+
+  async function loadAnalytics() {
+    try {
+      const res  = await fetch(`${API}/analytics/summary`);
+      const data = await res.json();
+
+      document.getElementById('statsGrid').innerHTML = `
+        <div class="stat">
+          <div class="stat-label">Задач выполнено</div>
+          <div class="stat-value">${data.total_tasks_completed}<span class="stat-unit">шт</span></div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Среднее время на задачу</div>
+          <div class="stat-value">${data.average_hours_per_task}<span class="stat-unit">ч</span></div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Период</div>
+          <div class="stat-value" style="font-size:18px;">Последние 24ч</div>
+        </div>
+      `;
+
+      const cpu = data.system_load.avg_cpu;
+      const mem = data.system_load.max_memory * 100;
+
+      document.getElementById('loadRow').innerHTML = `
+        <div class="load-item">
+          <div class="load-item-label">Средняя нагрузка CPU</div>
+          <div class="load-item-value">${cpu}<span class="stat-unit">%</span></div>
+          <div class="bar-wrap"><div class="bar" style="width:${Math.min(cpu,100)}%"></div></div>
+        </div>
+        <div class="load-item">
+          <div class="load-item-label">Максимальное использование памяти</div>
+          <div class="load-item-value">${data.system_load.max_memory}<span class="stat-unit">/ 1.0</span></div>
+          <div class="bar-wrap"><div class="bar mem" style="width:${Math.min(mem,100)}%"></div></div>
+        </div>
+      `;
+
+      document.getElementById('analyticsUpdated').textContent = `Обновлено в ${now()}`;
+    } catch (err) {
+      addLog(`Ошибка загрузки аналитики: ${err.message}`, 'err');
+    }
+  }
+
+  async function triggerIngestion() {
+    const btn    = document.getElementById('ingestBtn');
+    const status = document.getElementById('ingestStatus');
+    btn.disabled = true;
+    status.textContent = 'Отправка запроса...';
+    status.style.color = 'var(--muted)';
+    try {
+      const res  = await fetch(`${API}/ingestion/trigger`, { method: 'POST' });
+      const data = await res.json();
+      status.textContent = 'Загрузка данных запущена';
+      status.style.color = 'var(--green)';
+      addLog('Загрузка данных запущена', 'ok');
+    } catch (err) {
+      status.textContent = `Ошибка: ${err.message}`;
+      status.style.color = 'var(--red)';
+      addLog(`Ошибка запуска загрузки: ${err.message}`, 'err');
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  let pollTimer = null;
+
+  async function pollReport(taskId) {
+    try {
+      const res  = await fetch(`${API}/reports/${taskId}`);
+      const data = await res.json();
+      const pill = document.getElementById('reportStatusPill');
+      pill.textContent  = statusLabel(data.status);
+      pill.className    = `status-pill ${pillClass(data.status)}`;
+      document.getElementById('reportTaskId').textContent = `№${data.id}`;
+
+      if (data.status === 'done') {
+        clearInterval(pollTimer);
+        addLog(`Отчёт №${data.id} готов`, 'ok');
+        const link = document.getElementById('reportS3Link');
+        link.textContent = 'Скачать отчёт (CSV)';
+        link.href = `${API}/reports/${taskId}/download`;
+        link.download = '';
+        link.style.display = 'block';
+      } else if (data.status === 'failed') {
+        clearInterval(pollTimer);
+        addLog(`Генерация отчёта завершилась ошибкой (task_id: ${taskId})`, 'err');
+      }
+    } catch (err) {
+      addLog(`Ошибка опроса статуса отчёта: ${err.message}`, 'err');
+    }
+  }
+
+  async function generateReport() {
+    const fromVal = document.getElementById('periodFrom').value;
+    const toVal   = document.getElementById('periodTo').value;
+    if (!fromVal || !toVal) {
+      addLog('Укажите начало и конец периода для отчёта', 'err');
+      return;
+    }
+
+    const btn = document.getElementById('reportBtn');
+    btn.disabled = true;
+
+    const box  = document.getElementById('reportBox');
+    const pill = document.getElementById('reportStatusPill');
+    const link = document.getElementById('reportS3Link');
+    link.style.display = 'none';
+    box.classList.add('visible');
+
+    try {
+      const res  = await fetch(`${API}/reports/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          period_from: new Date(fromVal).toISOString(),
+          period_to:   new Date(toVal).toISOString(),
+        }),
+      });
+      const data = await res.json();
+
+      document.getElementById('reportTaskId').textContent = `№${data.id ?? '…'}`;
+      pill.textContent = statusLabel(data.status);
+      pill.className   = `status-pill ${pillClass(data.status)}`;
+
+      addLog(`Генерация отчёта запущена`, 'info');
+
+      clearInterval(pollTimer);
+      pollTimer = setInterval(() => pollReport(data.task_id), 2000);
+    } catch (err) {
+      addLog(`Ошибка создания отчёта: ${err.message}`, 'err');
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  const defaultFrom = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const defaultTo   = new Date();
+  const toLocalISO  = (d) => new Date(d - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+  document.getElementById('periodFrom').value = toLocalISO(defaultFrom);
+  document.getElementById('periodTo').value   = toLocalISO(defaultTo);
+
+  checkHealth();
+  loadAnalytics();
+  setInterval(checkHealth,    30000);
+  setInterval(loadAnalytics,  30000);
+  addLog('Подключение к API...', 'info');
+</script>
+</body>
+</html>
